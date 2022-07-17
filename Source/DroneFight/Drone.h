@@ -14,6 +14,9 @@
 class UStaticMeshComponent;
 class UBoxComponent;
 class UPhysicsThrusterComponent;
+class USpringArmComponent;
+class UCameraComponent;
+
 UCLASS()
 class DRONEFIGHT_API ADrone : public APawn
 {
@@ -21,15 +24,21 @@ class DRONEFIGHT_API ADrone : public APawn
 
 public:
 	ADrone();
+	virtual void Tick(float DeltaTime) override;
+	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
+	//操控
+	UFUNCTION()
+		void Lift(float scale);
+	UFUNCTION()
+		void Forward(float scale);
+	UFUNCTION()
+		void Turn(float scale);
 protected:
 	virtual void BeginPlay() override;
 public:	
-	virtual void Tick(float DeltaTime) override;
-	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
-private:
+
 	/*属性成员*/
-
 
 	//碰撞盒子
 	UPROPERTY(VisibleAnywhere)
@@ -55,4 +64,19 @@ private:
 	UPROPERTY(VisibleAnywhere)
 		UPhysicsThrusterComponent* ForwardThruster;
 
+	//操控灵敏度
+	UPROPERTY(EditAnywhere, BluePrintReadWrite, Category = "Init")
+		float LiftAcc;
+	UPROPERTY(EditAnywhere, BluePrintReadWrite, Category = "Init")
+		float ForwardAcc;
+	UPROPERTY(EditAnywhere, BluePrintReadWrite, Category = "Init")
+		float TurnAcc;
+	UPROPERTY(EditAnywhere, BluePrintReadWrite, Category = "Init")
+		float ThrustStrengthMax;
+
+	//摄像机组件
+	UPROPERTY(VisibleAnywhere)
+		USpringArmComponent* SpringArmComponent;//摄像机 臂
+	UPROPERTY(VisibleAnywhere)
+		UCameraComponent* CameraComponent;//摄像机
 };
