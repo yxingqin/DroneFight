@@ -6,17 +6,15 @@
 #include "GameFramework/Pawn.h"
 #include "Drone.generated.h"
 
-/**
-* @brief ÎŞÈË»úÀà
-**/
-
 
 class UStaticMeshComponent;
 class UBoxComponent;
 class UPhysicsThrusterComponent;
 class USpringArmComponent;
 class UCameraComponent;
-
+/**
+* @brief  æ— äººæœºç±»
+*/
 UCLASS()
 class DRONEFIGHT_API ADrone : public APawn
 {
@@ -26,57 +24,83 @@ public:
 	ADrone();
 	virtual void Tick(float DeltaTime) override;
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
-	//²Ù¿Ø
+	//å‚ç›´æ“çºµ
 	UFUNCTION()
-		void Lift(float scale);
+	void Lift(float scale);
+	//æ°´å¹³ æ“æ§
 	UFUNCTION()
-		void Forward(float scale);
+	void Forward(float scale);
+	//æ—‹è½¬æ“æ§
 	UFUNCTION()
-		void Turn(float scale);
+	void Turn(float scale);
+	//æ‘„åƒæœº Xè½´
+	void CameraX(float scale);
+	//æ‘„åƒæœº Yè½´
+	void CameraY(float scale);
+	
+	
 protected:
 	virtual void BeginPlay() override;
+private:
+	//åˆå§‹ç½‘æ ¼ä½“
+	void InitMesh();
+	//åˆå§‹åŒ– å‚æ•°
+	void InitParam();
+	//åˆå§‹åŒ– æ‘„åƒæœº
+	void InitCamera();
+	//åˆå§‹åŒ– æ¨è¿›å™¨
+	void InitThruster();
+	//æ—‹è½¬æœºç¿¼
+	void RoutePaddle(float DeltaTime);
 public:	
 
 
-	/*ÊôĞÔ³ÉÔ±*/
+	//ç¢°æ’ç›’å­
+	UPROPERTY(VisibleAnywhere,BlueprintReadWrite)
+	UBoxComponent* OutCollision;
+	//æ— äººæœº
+	UPROPERTY(VisibleAnywhere,BlueprintReadWrite)
+	UStaticMeshComponent* Mesh;
+	//æ— äººæœºé£ç¿¼ x 4
 
-	//Åö×²ºĞ×Ó
-	UPROPERTY(VisibleAnywhere)
-		UBoxComponent* OutCollision;
+	UPROPERTY(VisibleAnywhere,BlueprintReadWrite)
+	UStaticMeshComponent* Paddle1;
+	UPROPERTY(VisibleAnywhere,BlueprintReadWrite)
+	UStaticMeshComponent* Paddle2;
+	UPROPERTY(VisibleAnywhere,BlueprintReadWrite)
+	UStaticMeshComponent* Paddle3;
+	UPROPERTY(VisibleAnywhere,BlueprintReadWrite)
+	UStaticMeshComponent* Paddle4;
 
-	//ÎŞÈË»ú
-	UPROPERTY(VisibleAnywhere) //Ìá¹©À¬»ø»ØÊÕ»úÖÆ¡¢¿ÉÒÔÔÚĞé»ÃÒıÇæÖĞ·ÃÎÊ¡¢¶øÇÒÌá¹©ĞòÁĞ»¯ÄÜÁ¦
-		UStaticMeshComponent* Mesh;
+	//å‘ä¸Šçš„æ¨è¿›å™¨
+	UPROPERTY(VisibleAnywhere,BlueprintReadWrite)
+	UPhysicsThrusterComponent* UpThruster;
+	//å‘ä¸‹çš„æ¨è¿›å™¨
+	UPROPERTY(VisibleAnywhere,BlueprintReadWrite)
+	UPhysicsThrusterComponent* ForwardThruster;
 
-	//ÎŞÈË»ú·ÉÒí x 4
-	UPROPERTY(VisibleAnywhere)
-		UStaticMeshComponent* Paddle1;
-	UPROPERTY(VisibleAnywhere)
-		UStaticMeshComponent* Paddle2;
-	UPROPERTY(VisibleAnywhere)
-		UStaticMeshComponent* Paddle3;
-	UPROPERTY(VisibleAnywhere)
-		UStaticMeshComponent* Paddle4;
+	//ä¸Šä¸‹çµæ•
+	UPROPERTY(EditAnywhere, BluePrintReadWrite, Category = "ControlSensitivity")
+	float VerticalAcc;
+	//æ°´å¹³çµæ•
+	UPROPERTY(EditAnywhere, BluePrintReadWrite, Category = "ControlSensitivity")
+	float HorizonAcc;
+	//æ—‹è½¬çµæ•
+	UPROPERTY(EditAnywhere, BluePrintReadWrite, Category = "ControlSensitivity")
+	float TurnAcc;
+	//å‚ç›´ æœ€å¤§æ¨åŠ›
+	UPROPERTY(EditAnywhere, BluePrintReadWrite, Category = "ControlSensitivity")
+	float VerThrustStrengthAbsMax;
+	//æ°´å¹³ æœ€å¤§æ¨åŠ›
+	UPROPERTY(EditAnywhere, BluePrintReadWrite, Category = "ControlSensitivity")
+	float HorThrustStrengthAbsMax;
+	UPROPERTY(EditAnywhere, BluePrintReadWrite, Category = "ControlSensitivity")
+	float PaddleRouteSpeed;
+	//æ‘„åƒæœºè‡‚
+	UPROPERTY(VisibleAnywhere,BlueprintReadWrite)
+	USpringArmComponent* SpringArmComponent;
+	//æ‘„åƒæœº
+	UPROPERTY(VisibleAnywhere,BlueprintReadWrite)
+	UCameraComponent* CameraComponent;
 
-	//ÍÆ½øÆ÷
-	UPROPERTY(VisibleAnywhere)
-		UPhysicsThrusterComponent* UpThruster;
-	UPROPERTY(VisibleAnywhere)
-		UPhysicsThrusterComponent* ForwardThruster;
-
-	//²Ù¿ØÁéÃô¶È
-	UPROPERTY(EditAnywhere, BluePrintReadWrite, Category = "Init")
-		float LiftAcc;
-	UPROPERTY(EditAnywhere, BluePrintReadWrite, Category = "Init")
-		float ForwardAcc;
-	UPROPERTY(EditAnywhere, BluePrintReadWrite, Category = "Init")
-		float TurnAcc;
-	UPROPERTY(EditAnywhere, BluePrintReadWrite, Category = "Init")
-		float ThrustStrengthMax;
-
-	//ÉãÏñ»ú×é¼ş
-	UPROPERTY(VisibleAnywhere)
-		USpringArmComponent* SpringArmComponent;//ÉãÏñ»ú ±Û
-	UPROPERTY(VisibleAnywhere)
-		UCameraComponent* CameraComponent;//ÉãÏñ»ú
 };

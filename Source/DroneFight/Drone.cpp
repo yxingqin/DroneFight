@@ -2,6 +2,8 @@
 
 
 #include "Drone.h"
+
+#include "KismetCastingUtils.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/BoxComponent.h"
 #include "PhysicsEngine/PhysicsThrusterComponent.h"
@@ -12,98 +14,153 @@
 
 ADrone::ADrone()
 {
-	PrimaryActorTick.bCanEverTick = true; //ÉèÖÃÃ¿Ò»Ö¡¶¼µ÷ÓÃtick
-	
-	/*Åö×²Ìå*/
-	OutCollision = CreateDefaultSubobject<UBoxComponent>(TEXT("OutCollision"));
-	RootComponent = OutCollision;//×÷ÎªRootÔªËØ
-	OutCollision->SetBoxExtent(FVector(90,90,40));//ÉèÖÃ´óĞ¡
-	OutCollision->SetSimulatePhysics(true);//¿ªÆôÎïÀí
-	OutCollision->SetCollisionProfileName(TEXT("Pawn"));
-	//Ëø¶¨X Y Ğı×ª£¬·ÀÖ¹·¢ÉúÇãĞ±
-	OutCollision->BodyInstance.bLockXRotation = true;
-	OutCollision->BodyInstance.bLockYRotation = true;
-	FString x;
-	/*ÉèÖÃÎŞÈË»úÄ£ĞÍ*/
-	Mesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Mesh"));//ÎŞÈË»úÖ÷Ìå
-	Mesh->SetupAttachment(OutCollision);
-	Mesh->SetRelativeLocation(FVector(0.0f, 0.0f, 25.0f));
-	Paddle1 = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Paddle1"));//·ÉÒí
-	Paddle2 = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Paddle2"));
-	Paddle3 = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Paddle3"));
-	Paddle4 = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Paddle4"));
-	//·ÉÒí¹ÒÔÚ µ½ÎŞÈË»úÉÏ
-	Paddle1->SetupAttachment(Mesh, TEXT("Paddle1"));
-	Paddle2->SetupAttachment(Mesh, TEXT("Paddle2"));
-	Paddle3->SetupAttachment(Mesh, TEXT("Paddle3"));
-	Paddle4->SetupAttachment(Mesh, TEXT("Paddle4"));
-
-	/*ÉèÖÃÍÆ½øÆ÷*/
-	UpThruster = CreateDefaultSubobject<UPhysicsThrusterComponent>(TEXT("UpThruster"));
-	UpThruster->SetupAttachment(RootComponent);
-	UpThruster->ThrustStrength = 980.0f;
-	//UpThruster->ThrustStrength = 980.0f * OutCollision->GetMass();
-	UpThruster->SetAutoActivate(true);
-	UpThruster->SetWorldRotation(UKismetMathLibrary::MakeRotFromX(-GetActorUpVector()));//Ğı×ªµ½ÏòÏÂ
-	ForwardThruster = CreateDefaultSubobject<UPhysicsThrusterComponent>(TEXT("ForwardThruster"));
-	ForwardThruster->SetupAttachment(RootComponent);
-	ForwardThruster->ThrustStrength = 0.0f;
-	ForwardThruster->SetAutoActivate(true);
-	ForwardThruster->SetWorldRotation(UKismetMathLibrary::MakeRotFromX(-GetActorForwardVector()));//Ğı×ªµ½ÏòÏÂ
-
-	//²Ù¿ØÁéÃô¶È
-	this->LiftAcc = 2000.0f;
-	this->ForwardAcc = 3000.0f;
-	this->TurnAcc = 500000.0f;
-	this->ThrustStrengthMax = 1000.0f;
-
-	//ÉãÏñ»ú
-	SpringArmComponent = CreateDefaultSubobject<USpringArmComponent>("SpringArmComponent");
-	SpringArmComponent->SetupAttachment(RootComponent);
-	SpringArmComponent->TargetArmLength = 300.0f;
-
-	CameraComponent = CreateDefaultSubobject<UCameraComponent>("CameraComponent");
-	CameraComponent->SetupAttachment(SpringArmComponent);
+	PrimaryActorTick.bCanEverTick = true; //è®¾ç½®æ¯ä¸€å¸§éƒ½è°ƒç”¨tick
+	InitMesh();
+	InitCamera();
+	InitParam();
+	InitThruster();
 }
-
 // Called when the game starts or when spawned
 void ADrone::BeginPlay()
 {
 	Super::BeginPlay();
-
-	//»¹Ô­ÍÆ½øÆ÷Ç¿¶È
-	if (GetInputAxisValue(TEXT("Lift")) == 0.0f)
-		UpThruster->ThrustStrength = 980.0f;
-	if (GetInputAxisValue(TEXT("Forward")) == 0.0f)
-		ForwardThruster->ThrustStrength = 0.0f;
-	
 }
 
 // Called every frame
 void ADrone::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+	//æ—‹è½¬æœºç¿¼
+	RoutePaddle(DeltaTime);
+	
+	// åœ¨æ“æ§æ—¶ è¿˜åŸæ¨è¿›å™¨å¼ºåº¦
+	if (GetInputAxisValue(TEXT("Lift")) == 0.0f)
+		UpThruster->ThrustStrength = 980.0f * OutCollision->GetMass();//
+	if (GetInputAxisValue(TEXT("Forward")) == 0.0f)
+	{
+		ForwardThruster->ThrustStrength = 0.0f;
+		//è¿˜åŸæœºèº«ä½“ å€¾æ–œ
+		auto Pitch = Mesh->GetRelativeRotation().Pitch;
+		if(Pitch!=0)
+		{
+			Mesh->AddRelativeRotation(FRotator(-Pitch*DeltaTime,.0f,.0f));
+			if(FMath::Abs(Mesh->GetRelativeRotation().Pitch)<=KINDA_SMALL_NUMBER)
+				Mesh->SetRelativeRotation(FRotator(.0f,.0f,.0f));
+		}
+	}
+	
 }
 
 // Called to bind functionality to input
 void ADrone::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
-	//°ó¶¨ÊäÈë
+	//ç»‘å®šè¾“å…¥
 	PlayerInputComponent->BindAxis(TEXT("Lift"), this, &ADrone::Lift);
 	PlayerInputComponent->BindAxis(TEXT("Forward"), this, &ADrone::Forward);
 	PlayerInputComponent->BindAxis(TEXT("Turn"), this, &ADrone::Turn);
+	PlayerInputComponent->BindAxis(TEXT("CameraX"), this, &ADrone::CameraX);
+	PlayerInputComponent->BindAxis(TEXT("CameraY"), this, &ADrone::CameraY);
 }
+
+void ADrone::InitMesh()
+{
+		/*ç¢°æ’ä½“*/
+    	OutCollision = CreateDefaultSubobject<UBoxComponent>(TEXT("OutCollision"));
+    	RootComponent = OutCollision;//ä½œä¸ºRootå…ƒç´ 
+    	OutCollision->SetBoxExtent(FVector(90,90,40));//è®¾ç½®å¤§å°
+    	OutCollision->SetSimulatePhysics(true);//å¼€å¯ç‰©ç†
+    	OutCollision->SetCollisionProfileName(TEXT("Pawn"));
+    	//é”å®šX Y æ—‹è½¬ï¼Œé˜²æ­¢å‘ç”Ÿå€¾æ–œ
+    	OutCollision->BodyInstance.bLockXRotation = true;
+    	OutCollision->BodyInstance.bLockYRotation = true;
+    	/*è®¾ç½®æ— äººæœºæ¨¡å‹*/
+    	Mesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Mesh"));//æ— äººæœºä¸»ä½“
+    	Mesh->SetupAttachment(OutCollision);
+    	Mesh->SetRelativeLocation(FVector(0.0f, 0.0f, 25.0f));
+    	Paddle1 = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Paddle1"));//é£ç¿¼
+    	Paddle2 = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Paddle2"));
+    	Paddle3 = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Paddle3"));
+    	Paddle4 = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Paddle4"));
+    	//é£ç¿¼æŒ‚åœ¨ åˆ°æ— äººæœºä¸Š
+    	Paddle1->SetupAttachment(Mesh, TEXT("Paddle1"));
+    	Paddle2->SetupAttachment(Mesh, TEXT("Paddle2"));
+    	Paddle3->SetupAttachment(Mesh, TEXT("Paddle3"));
+    	Paddle4->SetupAttachment(Mesh, TEXT("Paddle4"));
+}
+
+void ADrone::InitParam()
+{	
+ 	this->VerticalAcc = 2000.0f;
+ 	this->HorizonAcc = 2000.0f;
+	this->TurnAcc = 100000000.0f;
+ 	
+ 	this->VerThrustStrengthAbsMax = 3000.0f;
+ 	this->HorThrustStrengthAbsMax = 3000.0f;
+
+	this->PaddleRouteSpeed=2000.0f;
+}
+
+void ADrone::InitCamera()
+{	
+ 	SpringArmComponent = CreateDefaultSubobject<USpringArmComponent>("SpringArmComponent");
+ 	SpringArmComponent->SetupAttachment(RootComponent);
+ 	SpringArmComponent->TargetArmLength = 300.0f;
+ 
+ 	CameraComponent = CreateDefaultSubobject<UCameraComponent>("CameraComponent");
+ 	CameraComponent->SetupAttachment(SpringArmComponent);
+
+	SpringArmComponent->AddRelativeRotation(FRotator(-25.0f,.0f,.0f));
+}
+
+void ADrone::InitThruster()
+{
+    	UpThruster = CreateDefaultSubobject<UPhysicsThrusterComponent>(TEXT("UpThruster"));
+    	UpThruster->SetupAttachment(RootComponent);
+    	UpThruster->ThrustStrength = 980.0f;
+    	UpThruster->SetAutoActivate(true);
+    	UpThruster->SetWorldRotation(UKismetMathLibrary::MakeRotFromX(-GetActorUpVector()));//æ—‹è½¬åˆ°å‘ä¸‹
+    	ForwardThruster = CreateDefaultSubobject<UPhysicsThrusterComponent>(TEXT("ForwardThruster"));
+    	ForwardThruster->SetupAttachment(RootComponent);
+    	ForwardThruster->ThrustStrength = 0.0f;
+    	ForwardThruster->SetAutoActivate(true);
+    	ForwardThruster->SetWorldRotation(UKismetMathLibrary::MakeRotFromX(-GetActorForwardVector()));//æ—‹è½¬åˆ°å‘ä¸‹
+}
+
+void ADrone::RoutePaddle(float DeltaTime)
+{
+	Paddle1->AddRelativeRotation(FRotator(0.0f,PaddleRouteSpeed*DeltaTime,0.0f));
+	Paddle2->AddRelativeRotation(FRotator(0.0f,PaddleRouteSpeed*DeltaTime,0.0f));
+	Paddle3->AddRelativeRotation(FRotator(0.0f,PaddleRouteSpeed*DeltaTime,0.0f));
+	Paddle4->AddRelativeRotation(FRotator(0.0f,PaddleRouteSpeed*DeltaTime,0.0f));
+}
+
+void ADrone::CameraX(float scale)
+{
+	SpringArmComponent->AddRelativeRotation(FRotator(0,scale,0));
+}
+
+void ADrone::CameraY(float scale)
+{
+	auto  temp =SpringArmComponent->GetRelativeRotation();
+	if(temp.Pitch<=45.0f&&scale>0||temp.Pitch>=-45.0f&&scale<0)
+		SpringArmComponent->AddRelativeRotation(FRotator(scale,0,0));
+}
+
 
 void ADrone::Lift(float scale)
 {
-	UpThruster->ThrustStrength += scale * LiftAcc * GetWorld()->DeltaRealTimeSeconds;//ĞèÒª½áºÏÖ¡ÂÊµÄÊ±¼ä
-	UpThruster->ThrustStrength = FMath::Clamp(UpThruster->ThrustStrength, -ThrustStrengthMax, ThrustStrengthMax);
+	//ä¸Šä¸‹ç§»åŠ¨   æ³¨æ„æ¶‰åŠåˆ°æ¯ä¸€å¸§éƒ½éœ€è¦ç´¯è®¡çš„æ“ä½œï¼Œéœ€è¦ä¹˜ä»¥ä¸€ä¸ªç³»æ•°
+	UpThruster->ThrustStrength += scale * VerticalAcc * GetWorld()->DeltaRealTimeSeconds;//éœ€è¦ç»“åˆå¸§ç‡çš„æ—¶é—´
+	UpThruster->ThrustStrength = FMath::Clamp(UpThruster->ThrustStrength, -VerThrustStrengthAbsMax, VerThrustStrengthAbsMax);
 }
 void ADrone::Forward(float scale)
 {
-	ForwardThruster->ThrustStrength += scale * ForwardAcc * GetWorld()->DeltaRealTimeSeconds;
-	ForwardThruster->ThrustStrength = FMath::Clamp(ForwardThruster->ThrustStrength, -ThrustStrengthMax, ThrustStrengthMax);
+	auto delta =  GetWorld()->DeltaRealTimeSeconds;
+	ForwardThruster->ThrustStrength += delta*scale*HorizonAcc;
+	ForwardThruster->ThrustStrength = FMath::Clamp(ForwardThruster->ThrustStrength, -HorThrustStrengthAbsMax, HorThrustStrengthAbsMax);
+	if(FMath::Abs(Mesh->GetRelativeRotation().Pitch)<30.0f)
+		Mesh->AddRelativeRotation(FRotator(-scale*delta*100.0f,.0f,.0f));
 }
 void ADrone::Turn(float scale)
 {
